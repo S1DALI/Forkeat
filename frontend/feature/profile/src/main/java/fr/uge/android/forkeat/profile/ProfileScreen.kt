@@ -276,11 +276,38 @@ fun SecurityCard(uiState: ProfileUiState, profileViewModel: ProfileViewModel) {
             }
             Divider(color = Color(0xFFE5E7EB), thickness = 1.dp)
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SecurityItem(
-                    label = "Adresse email",
-                    value = uiState.email,
-                    onClick = profileViewModel::openEmailModal
-                )
+                // Email row with verification badge
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF8F8F8), RoundedCornerShape(8.dp))
+                        .clickable(onClick = profileViewModel::openEmailModal)
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Adresse email", style = MaterialTheme.typography.titleMedium, color = Color(0xFF1E293B))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(uiState.email, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6B7280))
+                            val badgeText = if (uiState.emailVerified) "Vérifié" else "Non vérifié"
+                            val badgeColor = if (uiState.emailVerified) Color(0xFF22C55E) else Color(0xFFF97316)
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = badgeColor.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    badgeText,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = badgeColor,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                    Text("Modifier", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFF97316), fontWeight = FontWeight.Medium)
+                }
                 SecurityItem(
                     label = "Mot de passe",
                     value = "••••••••",

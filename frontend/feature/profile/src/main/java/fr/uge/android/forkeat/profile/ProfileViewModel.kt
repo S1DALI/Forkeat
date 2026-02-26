@@ -32,7 +32,8 @@ data class ProfileUiState(
     val showEmailModal: Boolean = false,
     val showPasswordModal: Boolean = false,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val emailVerified: Boolean = false
 )
 
 class ProfileViewModel : ViewModel() {
@@ -75,7 +76,13 @@ class ProfileViewModel : ViewModel() {
                             username = user.username,
                             email = user.email,
                             role = user.role,
+                            emailVerified = user.emailVerified,
                             isLoading = false
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = "Impossible de charger le profil"
                         )
                     }
                 } else {
