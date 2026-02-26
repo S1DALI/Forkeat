@@ -76,10 +76,10 @@ public class AuthRestController {
 	public ResponseEntity<?> login(@RequestBody UserLoginDTO userLogin) {
 		Objects.requireNonNull(userLogin);
 		try {
-			authenticationManager
+			var authentication = authenticationManager
 					.authenticate(new UsernamePasswordAuthenticationToken(userLogin.username(), userLogin.password()));
 			var authData = new HashMap<String, String>();
-			authData.put("token", authPort.generateToken(userLogin.username()));
+			authData.put("token", authPort.generateToken(authentication.getName()));
 			authData.put("type", "Bearer");
 			return ResponseEntity.ok(authData);
 		} catch (AuthenticationException e) {
