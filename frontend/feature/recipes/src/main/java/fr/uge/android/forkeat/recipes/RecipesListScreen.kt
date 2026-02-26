@@ -41,7 +41,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fr.uge.android.forkeat.designsystem.theme.Primary500
 import fr.uge.android.forkeat.designsystem.theme.Secondary900
-import fr.uge.android.forkeat.designsystem.theme.SurfaceCream
 import fr.uge.android.forkeat.designsystem.theme.Typography
 import fr.uge.android.forkeat.recipes.data.dto.RecipeDTO
 import java.util.UUID
@@ -83,7 +82,7 @@ fun RecipesListScreen(
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .background(SurfaceCream)
+        .background(Color(0xFFF5F5F5))
         .padding(16.dp)
     ) {
       RecipeSearchFilterBar(
@@ -107,7 +106,8 @@ fun RecipesListScreen(
       Spacer(modifier = Modifier.height(8.dp))
       LazyColumn(
         modifier = Modifier.weight(1f),
-        state = listState
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
       ) {
         items(recipes) { recipe ->
           RecipeCard(recipe = recipe, onClick = {

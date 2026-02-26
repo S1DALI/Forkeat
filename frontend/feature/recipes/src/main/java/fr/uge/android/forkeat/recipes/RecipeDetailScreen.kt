@@ -1,13 +1,14 @@
 package fr.uge.android.forkeat.recipes
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,28 +16,38 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,7 +60,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -58,7 +72,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
+import fr.uge.android.forkeat.network.ForkEatApi
 import fr.uge.android.forkeat.designsystem.theme.Gray500
 import fr.uge.android.forkeat.designsystem.theme.Primary500
 import fr.uge.android.forkeat.designsystem.theme.Secondary700
@@ -89,10 +105,15 @@ fun RecipeDetailScreen(
     onDelete: () -> Unit = {},
     onCreateVariant: () -> Unit = {}
 ) {
+    val recipesViewModel: RecipesViewModel = viewModel()
     var diffModeActive by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var isLiked by remember { mutableStateOf(recipe.hasLiked) }
+    var likeCount by remember { mutableIntStateOf(recipe.nbLike.toInt()) }
+    LaunchedEffect(recipe.hasLiked) { isLiked = recipe.hasLiked }
+    LaunchedEffect(recipe.nbLike) { likeCount = recipe.nbLike.toInt() }
 
-    // ── Dialogue de confirmation de suppression ──────────────────────────────
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -110,45 +131,103 @@ fun RecipeDetailScreen(
         )
     }
 
-    Surface(color = SurfaceCream) {
-        val scrollState = rememberScrollState()
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(24.dp)
-        ) {
-            // ── Bouton retour ────────────────────────────────────────────────
-            Button(
-                onClick = onBack,
-                colors = ButtonDefaults.buttonColors(containerColor = Primary500)
-            ) { Text("Retour", color = Color.White) }
-
-            Spacer(Modifier.height(16.dp))
-
-            // ── Bannière variante ────────────────────────────────────────────
-            if (parent != null) {
-                VariantBanner(
-                    parentTitle = parent.title,
-                    diffModeActive = diffModeActive,
-                    onToggleDiffMode = { diffModeActive = !diffModeActive }
-                )
-                Spacer(Modifier.height(12.dp))
+    Scaffold(
+        containerColor = Color.White,
+        contentWindowInsets = WindowInsets(0),
+        bottomBar = {
+            when {
+                isOwner -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = onEdit,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Secondary700),
+                            shape = RoundedCornerShape(14.dp)
+                        ) { Text("Modifier", color = Color.White, fontWeight = FontWeight.SemiBold) }
+                        Button(
+                            onClick = { showDeleteDialog = true },
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            shape = RoundedCornerShape(14.dp)
+                        ) { Text("Supprimer", color = Color.White, fontWeight = FontWeight.SemiBold) }
+                    }
+                }
+                isAuthenticated -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Button(
+                            onClick = onCreateVariant,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Primary500),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(
+                                "Créer une variante",
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+                else -> {}
             }
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
 
-            // ── Image ────────────────────────────────────────────────────────
-            if (!recipe.imageUrl.isNullOrEmpty()) {
-                Box {
-                    Image(
-                        painter = rememberAsyncImagePainter(recipe.imageUrl),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxWidth().height(220.dp)
+                // ── Hero image ────────────────────────────────────────────────
+                Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
+                    if (!recipe.imageUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = recipe.imageUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFF7C3AED), Primary500)
+                                    )
+                                )
+                        )
+                    }
+                    // Scrim bas de l'image
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color(0xBB000000)),
+                                    startY = 120f
+                                )
+                            )
                     )
+                    // Badge image modifiée (diff)
                     if (diff?.imageChanged == true) {
                         Surface(
                             color = Color(0xFFF59E0B),
                             shape = RoundedCornerShape(50.dp),
-                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 60.dp, end = 16.dp)
                         ) {
                             Text(
                                 "Image modifiée",
@@ -159,187 +238,390 @@ fun RecipeDetailScreen(
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+
+                // ── Carte blanche (overlap -28dp sur l'image) ─────────────────
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            val overlap = 28.dp.roundToPx()
+                            layout(placeable.width, placeable.height - overlap) {
+                                placeable.placeRelative(0, -overlap)
+                            }
+                        },
+                    color = Color.White,
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    shadowElevation = 0.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(
+                            start = 20.dp,
+                            end = 20.dp,
+                            top = 24.dp,
+                            bottom = 16.dp
+                        )
+                    ) {
+                        // ── Titre ─────────────────────────────────────────────
+                        Text(
+                            text = recipe.title,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E293B),
+                            lineHeight = 28.sp
+                        )
+                        if (diff?.titleChanged == true && diff.originalTitle != null) {
+                            Spacer(Modifier.height(4.dp))
+                            Surface(
+                                color = Color(0xFFFFFBEB),
+                                shape = RoundedCornerShape(50.dp),
+                                border = BorderStroke(1.dp, Color(0xFFFCD34D))
+                            ) {
+                                Text(
+                                    text = "Titre modifié · Original : ${diff.originalTitle}",
+                                    style = Typography.labelSmall,
+                                    color = Color(0xFFB45309),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+
+                        // ── Auteur ─────────────────────────────────────────────
+                        Text(
+                            text = "Par ${recipe.username}",
+                            style = Typography.labelSmall,
+                            color = Gray500
+                        )
+
+                        Spacer(Modifier.height(14.dp))
+
+                        // ── Pills (temps + likes + delta diff) ─────────────────
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Temps
+                            Surface(
+                                color = Color(0xFF22C55E),
+                                shape = RoundedCornerShape(50)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = formatDuration(recipe.preparationMinutes),
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                            // Likes
+                            Surface(
+                                color = if (isLiked) Color(0xFFFFE4E6) else Color(0xFFF1F5F9),
+                                shape = RoundedCornerShape(50)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Icon(
+                                        if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                        contentDescription = null,
+                                        tint = if (isLiked) Color(0xFFFF4D6D) else Color(0xFF94A3B8),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = formatCount(likeCount),
+                                        color = if (isLiked) Color(0xFFFF4D6D) else Color(0xFF94A3B8),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                            // Delta temps (diff)
+                            if (diff != null && diff.timeDelta != 0) {
+                                val isPositive = diff.timeDelta > 0
+                                Surface(
+                                    color = if (isPositive) Color(0xFFFFF7ED) else Color(0xFFECFDF5),
+                                    shape = RoundedCornerShape(50),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (isPositive) Color(0xFFFBD38D) else Color(0xFF6EE7B7)
+                                    )
+                                ) {
+                                    Text(
+                                        text = "${if (isPositive) "+" else ""}${diff.timeDelta} min",
+                                        style = Typography.labelSmall,
+                                        color = if (isPositive) Color(0xFFB45309) else Color(0xFF059669),
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // ── Résumé ─────────────────────────────────────────────
+                        if (recipe.summary.isNotBlank()) {
+                            Spacer(Modifier.height(14.dp))
+                            Text(
+                                text = recipe.summary,
+                                style = Typography.bodyMedium,
+                                color = Color(0xFF64748B)
+                            )
+                            val originalSummary = diff?.originalSummary
+                            if (diff?.summaryChanged == true && originalSummary != null) {
+                                Spacer(Modifier.height(8.dp))
+                                Surface(
+                                    color = Color(0xFFFFFBEB),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, Color(0xFFFCD34D)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text(
+                                            "Description originale",
+                                            style = Typography.labelSmall,
+                                            color = Color(0xFFB45309),
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            text = originalSummary,
+                                            style = Typography.bodySmall,
+                                            color = Color(0xFFB45309),
+                                            textDecoration = TextDecoration.LineThrough,
+                                            fontStyle = FontStyle.Italic
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Allergènes ─────────────────────────────────────────
+                        val hasAllergens = (diff != null && diff.allergens.isNotEmpty()) ||
+                                recipe.allergens.isNotEmpty()
+                        if (hasAllergens) {
+                            Spacer(Modifier.height(12.dp))
+                            if (diff != null && diff.allergens.isNotEmpty()) {
+                                DiffAllergenBadges(diff.allergens, diffModeActive)
+                            } else {
+                                AllergenBadges(recipe.allergens)
+                            }
+                        }
+
+                        // ── Régimes alimentaires ───────────────────────────────
+                        val activeDietaryFlags = recipe.dietaryFlags.filter { it.value }
+                        val hasDietary = (diff != null && diff.dietaryFlags.isNotEmpty()) ||
+                                activeDietaryFlags.isNotEmpty()
+                        if (hasDietary) {
+                            Spacer(Modifier.height(8.dp))
+                            if (diff != null && diff.dietaryFlags.isNotEmpty()) {
+                                DiffDietaryFlagBadges(diff.dietaryFlags, diffModeActive)
+                            } else {
+                                DietaryFlagBadges(activeDietaryFlags)
+                            }
+                        }
+
+                        // ── Bannière variante ──────────────────────────────────
+                        if (parent != null) {
+                            Spacer(Modifier.height(14.dp))
+                            VariantBanner(
+                                parentTitle = parent.title,
+                                diffModeActive = diffModeActive,
+                                onToggleDiffMode = { diffModeActive = !diffModeActive }
+                            )
+                        }
+
+                        Spacer(Modifier.height(20.dp))
+
+                        // ── Tabs ───────────────────────────────────────────────
+                        TabRow(
+                            selectedTabIndex = selectedTab,
+                            containerColor = Color.Transparent,
+                            contentColor = Primary500,
+                            divider = { HorizontalDivider(color = Color(0xFFE5E7EB)) }
+                        ) {
+                            listOf("Ingrédients", "Préparation").forEachIndexed { index, title ->
+                                Tab(
+                                    selected = selectedTab == index,
+                                    onClick = { selectedTab = index },
+                                    text = {
+                                        Text(
+                                            title,
+                                            fontWeight = if (selectedTab == index) FontWeight.SemiBold
+                                            else FontWeight.Normal,
+                                            color = if (selectedTab == index) Primary500
+                                            else Color(0xFF9CA3AF)
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        // ── Contenu onglets ────────────────────────────────────
+                        when (selectedTab) {
+                            0 -> {
+                                if (diff != null && diff.ingredients.isNotEmpty()) {
+                                    diff.ingredients.forEach { DiffIngredientCard(it, diffModeActive) }
+                                } else if (recipe.ingredients.isNotEmpty()) {
+                                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                                    recipe.ingredients.forEach { IngredientCheckRow(it) }
+                                } else {
+                                    Text(
+                                        "Aucun ingrédient renseigné",
+                                        color = Gray500,
+                                        style = Typography.bodySmall,
+                                        modifier = Modifier.padding(vertical = 16.dp)
+                                    )
+                                }
+                            }
+                            1 -> {
+                                if (diff != null && diff.steps.isNotEmpty()) {
+                                    Spacer(Modifier.height(8.dp))
+                                    diff.steps.forEach { DiffStepCard(it, diffModeActive) }
+                                } else if (recipe.steps.isNotEmpty()) {
+                                    Spacer(Modifier.height(8.dp))
+                                    recipe.steps.forEach { StepCard(it) }
+                                } else {
+                                    Text(
+                                        "Aucune étape renseignée",
+                                        color = Gray500,
+                                        style = Typography.bodySmall,
+                                        modifier = Modifier.padding(vertical = 16.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(24.dp))
+                    }
+                }
             }
 
-            // ── Titre + boutons d'action ─────────────────────────────────────
+            // ── Boutons flottants sur l'image ─────────────────────────────────
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                    Text(recipe.title, style = Typography.titleLarge, color = Secondary700)
-                    if (diff?.titleChanged == true && diff.originalTitle != null) {
-                        Spacer(Modifier.height(4.dp))
-                        Surface(
-                            color = Color(0xFFFFFBEB),
-                            shape = RoundedCornerShape(50.dp),
-                            border = BorderStroke(1.dp, Color(0xFFFCD34D))
-                        ) {
-                            Text(
-                                text = "Titre modifié · Original : ${diff.originalTitle}",
-                                style = Typography.labelSmall,
-                                color = Color(0xFFB45309),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-                }
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    if (isAuthenticated) {
-                        OutlinedButton(
-                            onClick = onCreateVariant,
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Primary500),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text("Variante", color = Primary500, style = Typography.labelMedium)
-                        }
-                    }
-                    if (isOwner) {
-                        Button(
-                            onClick = onEdit,
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Secondary700),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text("Modifier", color = Color.White, style = Typography.labelMedium)
-                        }
-                        Button(
-                            onClick = { showDeleteDialog = true },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text("Supprimer", color = Color.White, style = Typography.labelMedium)
-                        }
-                    }
-                }
-            }
-
-            // ── Like ─────────────────────────────────────────────────────────
-            LikeButton(recipe.nbLike.toInt(), recipe.hasLiked, recipe.id, Modifier)
-            Spacer(Modifier.height(8.dp))
-
-            // ── Auteur + temps ───────────────────────────────────────────────
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Par ${recipe.username}", style = Typography.labelSmall, color = Gray500)
-                Spacer(Modifier.width(16.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("${recipe.preparationMinutes} min", style = Typography.labelMedium, color = Primary500)
-                    if (diff != null && diff.timeDelta != 0) {
-                        val isPositive = diff.timeDelta > 0
-                        Surface(
-                            color = if (isPositive) Color(0xFFFFF7ED) else Color(0xFFECFDF5),
-                            shape = RoundedCornerShape(50.dp),
-                            border = BorderStroke(
-                                1.dp,
-                                if (isPositive) Color(0xFFFBD38D) else Color(0xFF6EE7B7)
-                            )
-                        ) {
-                            Text(
-                                text = "${if (isPositive) "+" else ""}${diff.timeDelta} min vs original",
-                                style = Typography.labelSmall,
-                                color = if (isPositive) Color(0xFFB45309) else Color(0xFF059669),
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-
-            // ── Résumé ───────────────────────────────────────────────────────
-            Text(recipe.summary, style = Typography.bodyMedium)
-            val originalSummary = diff?.originalSummary
-            if (diff?.summaryChanged == true && originalSummary != null) {
-                Spacer(Modifier.height(8.dp))
+                // Bouton retour
                 Surface(
-                    color = Color(0xFFFFFBEB),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, Color(0xFFFCD34D)),
-                    modifier = Modifier.fillMaxWidth()
+                    onClick = onBack,
+                    shape = CircleShape,
+                    color = Color.White,
+                    shadowElevation = 4.dp,
+                    modifier = Modifier.size(42.dp)
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text(
-                            "Description originale",
-                            style = Typography.labelSmall,
-                            color = Color(0xFFB45309),
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = originalSummary,
-                            style = Typography.bodySmall,
-                            color = Color(0xFFB45309),
-                            textDecoration = TextDecoration.LineThrough,
-                            fontStyle = FontStyle.Italic
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Retour",
+                            tint = Color(0xFF1E293B),
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
+                // Bouton like circulaire (authentifié + email confirmé)
+                if (isAuthenticated && ForkEatApi.isEmailVerified()) {
+                    LikeButtonCircle(
+                        isLiked = isLiked,
+                        onToggle = {
+                            isLiked = !isLiked
+                            likeCount += if (isLiked) 1 else -1
+                            if (isLiked) recipesViewModel.likeRecipe(recipe.id)
+                            else recipesViewModel.unlikeRecipe(recipe.id)
+                        }
+                    )
+                }
             }
-            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
 
-            // ── Allergènes ───────────────────────────────────────────────────
-            if (diff != null && diff.allergens.isNotEmpty()) {
-                Text("Allergènes", style = Typography.titleMedium, color = Color(0xFFFFC107))
-                Spacer(Modifier.height(4.dp))
-                DiffAllergenBadges(diff.allergens, diffModeActive)
-                Spacer(Modifier.height(8.dp))
-            } else if (recipe.allergens.isNotEmpty()) {
-                Text("Allergènes", style = Typography.titleMedium, color = Color(0xFFFFC107))
-                Spacer(Modifier.height(4.dp))
-                AllergenBadges(recipe.allergens)
-                Spacer(Modifier.height(8.dp))
-            }
+// ══════════════════════════════════════════════════════════════════════════════
+// INGRÉDIENT AVEC CASE À COCHER
+// ══════════════════════════════════════════════════════════════════════════════
 
-            // ── Régimes alimentaires ─────────────────────────────────────────
-            val activeDietaryFlags = recipe.dietaryFlags.filter { it.value }
-            if (diff != null && diff.dietaryFlags.isNotEmpty()) {
-                Text("Régimes alimentaires", style = Typography.titleMedium, color = Color(0xFF4CAF50))
-                Spacer(Modifier.height(4.dp))
-                DiffDietaryFlagBadges(diff.dietaryFlags, diffModeActive)
-                Spacer(Modifier.height(8.dp))
-            } else if (activeDietaryFlags.isNotEmpty()) {
-                Text("Régimes alimentaires", style = Typography.titleMedium, color = Color(0xFF4CAF50))
-                Spacer(Modifier.height(4.dp))
-                DietaryFlagBadges(activeDietaryFlags)
-                Spacer(Modifier.height(8.dp))
-            }
+@Composable
+private fun IngredientCheckRow(ingredient: RecipeIngredientDTO) {
+    var checked by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { checked = !checked }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = { checked = it },
+            colors = CheckboxDefaults.colors(checkedColor = Primary500)
+        )
+        Spacer(Modifier.width(4.dp))
+        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "${formatQty(ingredient.quantity)} ${ingredient.unit}",
+                color = if (checked) Color(0xFFCBD5E1) else Primary500,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.width(72.dp),
+                textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None
+            )
+            Text(
+                text = ingredient.name,
+                style = Typography.bodyMedium,
+                color = if (checked) Color(0xFFCBD5E1) else Color(0xFF1E293B),
+                textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+    HorizontalDivider(color = Color(0xFFF1F5F9))
+}
 
-            // ── Ingrédients ──────────────────────────────────────────────────
-            if (diff != null && diff.ingredients.isNotEmpty()) {
-                Text("Ingrédients", style = Typography.titleMedium, color = Primary500)
-                Spacer(Modifier.height(4.dp))
-                diff.ingredients.forEach { DiffIngredientCard(it, diffModeActive) }
-                Spacer(Modifier.height(8.dp))
-            } else if (recipe.ingredients.isNotEmpty()) {
-                Text("Ingrédients", style = Typography.titleMedium, color = Primary500)
-                Spacer(Modifier.height(4.dp))
-                recipe.ingredients.forEach { IngredientCard(it) }
-                Spacer(Modifier.height(8.dp))
-            }
+// ══════════════════════════════════════════════════════════════════════════════
+// BOUTON LIKE CIRCULAIRE (OVERLAY)
+// ══════════════════════════════════════════════════════════════════════════════
 
-            // ── Étapes ───────────────────────────────────────────────────────
-            if (diff != null && diff.steps.isNotEmpty()) {
-                Text("Préparation", style = Typography.titleMedium, color = Secondary700)
-                Spacer(Modifier.height(4.dp))
-                diff.steps.forEach { DiffStepCard(it, diffModeActive) }
-            } else if (recipe.steps.isNotEmpty()) {
-                Text("Préparation", style = Typography.titleMedium, color = Secondary700)
-                Spacer(Modifier.height(4.dp))
-                recipe.steps.forEach { StepCard(it) }
-            }
-
-            Spacer(Modifier.height(24.dp))
+@Composable
+private fun LikeButtonCircle(
+    isLiked: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val heartColor by animateColorAsState(
+        targetValue = if (isLiked) Color(0xFFFF4D6D) else Color(0xFF64748B),
+        animationSpec = tween(300),
+        label = "heartColor"
+    )
+    Surface(
+        onClick = onToggle,
+        modifier = modifier.size(42.dp),
+        shape = CircleShape,
+        color = Color.White,
+        shadowElevation = 4.dp
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Icon(
+                imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                contentDescription = if (isLiked) "Unlike" else "Like",
+                tint = heartColor,
+                modifier = Modifier.size(22.dp)
+            )
         }
     }
 }
@@ -632,7 +914,7 @@ private fun DiffDietaryFlagBadges(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// INGRÉDIENTS
+// INGRÉDIENTS (version sans case à cocher, utilisée par le mode diff)
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
@@ -850,7 +1132,7 @@ private fun DiffStepCard(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// BOUTON LIKE
+// BOUTON LIKE (version complète conservée pour compatibilité)
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
@@ -938,6 +1220,15 @@ fun formatCount(count: Int): String = when {
     else               -> count.toString()
 }
 
+private fun formatDuration(minutes: Int): String = when {
+    minutes >= 60 -> {
+        val h = minutes / 60
+        val m = minutes % 60
+        if (m == 0) "${h}h" else "${h}h${m}min"
+    }
+    else -> "${minutes} min"
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PREVIEW
 // ══════════════════════════════════════════════════════════════════════════════
@@ -947,20 +1238,22 @@ fun formatCount(count: Int): String = when {
 fun PreviewRecipeDetailScreen() {
     val exampleRecipe = RecipeDetailsDTO(
         id = UUID.randomUUID(),
-        title = "Tarte aux pommes maison croustillante",
-        summary = "Une tarte aux pommes délicieusement croustillante.",
+        title = "Lasagnes Végétariennes Maison",
+        summary = "Une lasagne savoureuse aux épinards et ricotta, dorée à la perfection.",
         parentId = null,
-        username = "mamie_jeanne",
-        preparationMinutes = 75,
+        username = "chef_mario",
+        preparationMinutes = 45,
         imageUrl = "https://images.unsplash.com/photo-1504674900247-0877df9cc836",
         status = "PUBLISHED",
         steps = listOf(
-            RecipeStepDTO(1, "Préparez la pâte : mélangez la farine, le sel et le sucre glace."),
-            RecipeStepDTO(2, "Ajoutez l'œuf, formez une boule et réservez 30 min au frais.")
+            RecipeStepDTO(1, "Préchauffez le four à 180°C."),
+            RecipeStepDTO(2, "Faites revenir les épinards avec l'ail dans une poêle.")
         ),
         ingredients = listOf(
-            RecipeIngredientDTO("Farine de blé", 250.0, "g"),
-            RecipeIngredientDTO("Beurre doux froid", 125.0, "g")
+            RecipeIngredientDTO("Feuilles de lasagne", 12.0, "feuilles"),
+            RecipeIngredientDTO("Ricotta fraîche", 250.0, "g"),
+            RecipeIngredientDTO("Épinards frais", 500.0, "g"),
+            RecipeIngredientDTO("Sauce tomate", 400.0, "ml")
         ),
         allergens = listOf(
             AllergenDTO("1", "Gluten", "élevé"),
@@ -969,10 +1262,10 @@ fun PreviewRecipeDetailScreen() {
         dietaryFlags = mapOf("vegetarian" to true, "vegan" to false),
         createdAt = Instant.parse("2026-02-10T12:00:00Z"),
         updatedAt = Instant.parse("2026-02-10T12:00:00Z"),
-        nbLike = 10,
+        nbLike = 120,
         hasLiked = false
     )
-    RecipeDetailScreen(recipe = exampleRecipe, onBack = {})
+    RecipeDetailScreen(recipe = exampleRecipe, onBack = {}, isAuthenticated = true)
 }
 
 @Preview(showBackground = true, name = "Variante avec diff")

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import fr.uge.android.forkeat.designsystem.theme.Primary500
 import fr.uge.android.forkeat.designsystem.theme.Secondary700
 import fr.uge.android.forkeat.designsystem.theme.Gray500
+import androidx.compose.ui.graphics.RectangleShape
 
 @Composable
 fun RecipeSearchFilterBar(
@@ -39,40 +40,49 @@ fun RecipeSearchFilterBar(
     val focusManager = LocalFocusManager.current
 
     Column(modifier = modifier.fillMaxWidth()) {
-        // Search field
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchQueryChange,
+        // Search bar — pill shape with card shadow
+        Card(
+            shape = RoundedCornerShape(50),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            placeholder = { Text("Rechercher une recette...") },
-            leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null)
-            },
-            trailingIcon = {
-                if (searchQuery.isNotBlank()) {
-                    IconButton(onClick = { onSearchQueryChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = "Effacer")
+                .padding(bottom = 12.dp)
+        ) {
+            TextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
+                    Text("Chercher une recette...", color = Color(0xFF9CA3AF))
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF9CA3AF))
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { onSearchQueryChange("") }) {
+                            Icon(Icons.Default.Close, contentDescription = "Effacer", tint = Color(0xFF9CA3AF))
+                        }
                     }
-                }
-            },
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedBorderColor = Color(0xFFE5E7EB),
-                focusedBorderColor = Primary500,
-                unfocusedContainerColor = Color.White,
-                focusedContainerColor = Color.White,
-            ),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(
-                onSearch = {
-                    onSearchSubmit()
-                    focusManager.clearFocus()
-                }
+                },
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                ),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        onSearchSubmit()
+                        focusManager.clearFocus()
+                    }
+                )
             )
-        )
+        }
 
         // Allergen filters
         AnimatedVisibility(visible = availableAllergens.isNotEmpty()) {
