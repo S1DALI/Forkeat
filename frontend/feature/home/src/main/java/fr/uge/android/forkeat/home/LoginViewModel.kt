@@ -49,7 +49,9 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                     try {
                         val meResponse = ForkEatApi.authService.me()
                         if (meResponse.isSuccessful) {
-                            tokenManager.saveRole(meResponse.body()?.resource?.role ?: "MEMBER")
+                            val resource = meResponse.body()?.resource
+                            tokenManager.saveRole(resource?.role ?: "MEMBER")
+                            tokenManager.saveEmailVerified(resource?.emailVerified ?: false)
                         }
                     } catch (_: Exception) { /* non-bloquant */ }
                     _uiState.value = LoginUiState(isSuccess = true)
@@ -100,7 +102,9 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                     try {
                         val meResponse = ForkEatApi.authService.me()
                         if (meResponse.isSuccessful) {
-                            tokenManager.saveRole(meResponse.body()?.resource?.role ?: "MEMBER")
+                            val resource = meResponse.body()?.resource
+                            tokenManager.saveRole(resource?.role ?: "MEMBER")
+                            tokenManager.saveEmailVerified(resource?.emailVerified ?: false)
                         }
                     } catch (_: Exception) { /* non-bloquant */ }
                     _uiState.value = LoginUiState(isSuccess = true)

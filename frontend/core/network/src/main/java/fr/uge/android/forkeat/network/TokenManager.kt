@@ -22,8 +22,14 @@ class TokenManager(context: Context) {
 
     fun isAdmin(): Boolean = prefs.getString(KEY_ROLE, null) == "ADMIN"
 
+    fun saveEmailVerified(verified: Boolean) {
+        prefs.edit().putBoolean(KEY_EMAIL_VERIFIED, verified).apply()
+    }
+
+    fun isEmailVerified(): Boolean = prefs.getBoolean(KEY_EMAIL_VERIFIED, false)
+
     fun clearToken() {
-        prefs.edit().remove(KEY_TOKEN).remove(KEY_ROLE).apply()
+        prefs.edit().remove(KEY_TOKEN).remove(KEY_ROLE).remove(KEY_EMAIL_VERIFIED).apply()
     }
 
     fun isLoggedIn(): Boolean = getToken() != null
@@ -49,5 +55,6 @@ class TokenManager(context: Context) {
         private const val PREFS_NAME = "forkeat_auth"
         private const val KEY_TOKEN = "jwt_token"
         private const val KEY_ROLE = "user_role"
+        private const val KEY_EMAIL_VERIFIED = "email_verified"
     }
 }
