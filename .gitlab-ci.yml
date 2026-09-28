@@ -57,7 +57,7 @@ build-and-push-api:
     - apk add --no-cache docker docker-compose
     - echo "$DEPLOY_TOKEN_PASSWORD" | docker login -u "$DEPLOY_TOKEN_USERNAME" --password-stdin registry.gitlab.com
   script:
-    - cd backend && docker build -t registry.gitlab.com/adben27/projet-recettes-uge .
+    - cd backend && docker build --provenance=false --sbom=false -t registry.gitlab.com/adben27/projet-recettes-uge .
     - docker push registry.gitlab.com/adben27/projet-recettes-uge
 
 deploy-prod:
